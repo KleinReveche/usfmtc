@@ -40,14 +40,14 @@ class ETCursor:
             end = len(t)
             if other.attrib == self.attrib:
                 end = other.char
-            return t[start:end]
+            return t[start:end], end < len(t)
         t = eloc.text if isin else eloc.tail
         start = 0; end = len(t) if t else 0
         if eloc == self.el and self.istext() == isin:
             start = self.char
         if eloc == other.el and other.istext() == isin:
             end = other.char
-        return t[start:end] if t else t
+        return (t[start:end], end < len(t)) if t else (t, False)
 
 
 def testverse(v:str, verse:str, after=False) -> bool:
@@ -103,12 +103,13 @@ def _findel(node, tag, attrib, limits=[], parindex=None, count=None, start=None)
 def _scanel(refmrkr, usx, parindex, rend=None, verseonly=False):
     """ Returns element and parindex for a reference marker following the given parindex """
     pcounts = {}
+    error = (None, None)
     if rend is None:
         rend = len(usx.getroot()) 
     while parindex < rend:
         e = usx.getroot()[parindex]
         if e.tag == "chapter":      # bounded by CV
-            return None, None
+            return error
         s = e.get("style", "")
         pcounts[s] = pcounts.get(s, 0) + 1      # count paragraph indices by marker
         if s == refmrkr.mrkr and (not refmrkr.index or refmrkr.index == pcounts[s]):
@@ -116,8 +117,9 @@ def _scanel(refmrkr, usx, parindex, rend=None, verseonly=False):
         if verseonly and usx.grammar.marker_categories.get(s, "") == "versepara":   # test for verse bound
             for v in e:
                 if v.tag == "verse":
-                    return None, None
+                    return error
         parindex += 1
+    return error
 
 def _findcvel(ref, usx, atend=False, parindex=0):
     ''' Returns an element and mrkr index for a reference in a document. If atend
@@ -132,6 +134,7 @@ def _findcvel(ref, usx, atend=False, parindex=0):
     foundend = False
 
     # find a parindex for the given chapter
+    startparindex = parindex
     if c is not None and c > 0:
         for pari, el in enumerate(root[parindex:], start=parindex):
             if el.tag == "chapter" and int(el.get('number', 0)) == c:
@@ -148,6 +151,8 @@ def _findcvel(ref, usx, atend=False, parindex=0):
             else:
                 parindex = len(root)
     v = ref.verse
+    if atend and (v is None or v == 0) and any(getattr(ref, a, None) is not None for a in ref._parmlist[4:]):
+        parindex = startparindex
 
     # scan for verse. Verses always have paragraphs as their parent
     if v is not None and v != "end" and vint(v) > 0:
@@ -394,13 +399,13 @@ class USXCursor(ETCursor):
             # now always copy the element
             if isin:
                 newp = factory(eloc.tag, attrib=eloc.attrib, parent=currp)
-                newp.text = a.textin(b, eloc, isin)
+                newp.text, finished = a.textin(b, eloc, isin)
                 currp.append(newp)
                 currp = newp
                 curr = eloc
             # after the element so grab the tail and go up in the hierarchy
             elif eloc == curr:
-                currp.tail = a.textin(b, eloc, isin)
+                currp.tail, finished = a.textin(b, eloc, isin)
                 currp = currp.parent
                 curr = curr.parent if curr is not None else root
             else:
@@ -416,7 +421,7 @@ class USXCursor(ETCursor):
                 break
         return res
 
-    def copy_text(self, root, b):
+    def copy_text(self, root, b, grammar=None, notes=False):
         ''' Returns a text string of all the main text between self and b (exclusive)'''
         a = self
         res = []
@@ -427,9 +432,24 @@ class USXCursor(ETCursor):
         else:
             p = a.el
         i = list(root).index(p)
-        for eloc, isin in iterusx(root, parindex=i, start=a.el, until=b.el, untilafter=bool(b.attrib)):
-            t = a.textin(b, eloc, isin)
-            if t:
-                res.append(t)
+        lastnote = None
+        for eloc, isin in iterusx(root, parindex=i, start=a.el, until=b.el, untilafter=bool(b.attrib), grammar=grammar):
+            grabme = True
+            if lastnote is not None:
+                if lastnote == eloc:
+                    lastnote = None
+                grabme = False
+            if isin and lastnote is None:
+                s = eloc.get('style', '')
+                catt = grammar.marker_categories.get(s, "")
+                if not notes and catt in ('footnote', 'crossrefeence'):
+                    lastnote = eloc
+                    grabme = False
+            if grabme:
+                t, finished = a.textin(b, eloc, isin)
+                if t:
+                    res.append(t)
+                if finished:
+                    break
         return "".join(res)
 

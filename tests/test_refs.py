@@ -25,11 +25,7 @@ bkenv = BookNamesEnvironment(os.path.join(os.path.dirname(__file__), "BookNames.
 
 def _get_textref(s):
     r = Ref(s)
-    root = jon_usfm.getroot()
-    start = USXCursor.fromRef(r.first, jon_usfm)
-    end = USXCursor.fromRef(r.last, jon_usfm, atend=True)
-    print(start, end)
-    res = start.copy_text(root, end)
+    res = jon_usfm.gettext(r)
     return r, res
 
 def _r(bk, chap, verse, subv=None):
@@ -597,4 +593,53 @@ def test_subset2():
     if r'\ms1' not in f:
         fail(f"ms1 missing from {f}")
 
+def test_chapd():
+    s = r'''\id PSA LEB
+\c 78
+\cl Psalm 78
+\s1 God’s Faithfulness in Israel’s History
+\d A maskil of Asaph.\f + \fr Ps 78 \ft The Hebrew Bible counts the superscription as the first verse of the psalm \f*
+\q1 
+\v 1 Listen, O my people, to my teaching.
+\q1 Incline your ears to the words of my mouth.
+'''
+    doc = readFile(s, informat="usfm")
+    doc.canonicalise()
+    t = doc.gettext(Ref("PSA 78!d!2"))
+    if t != "maskil":
+        fail(f"Expected 'maskil' got {t} in {s}")
+
+def test_chap0():
+    s = r'''\id PSA LEB
+\c 78
+\cl Psalm 78
+\s1 God’s Faithfulness in Israel’s History
+\d A maskil of Asaph.\f + \fr Ps 78 \ft The Hebrew Bible counts the superscription as the first verse of the psalm \f*
+\q1 
+\v 1 Listen, O my people, to my teaching.
+\q1 Incline your ears to the words of my mouth.
+'''
+    doc = readFile(s, informat="usfm")
+    doc.canonicalise()
+    t = doc.gettext(Ref("PSA 78:0!d!2"))
+    if t != "maskil":
+        fail(f"Expected 'maskil' got {t} in {s}")
+
+def test_chap0f():
+    s = r'''\id PSA LEB
+\c 78
+\cl Psalm 78
+\s1 God’s Faithfulness in Israel’s History
+\d A maskil of Asaph.\f + \fr Ps 78 \ft The Hebrew Bible counts the superscription as the first verse of the psalm \f*
+\q1 
+\v 1 Listen, O my people, to my teaching.
+\q1 Incline your ears to the words of my mouth.
+'''
+    doc = readFile(s, informat="usfm")
+    doc.canonicalise()
+    t = doc.gettext(Ref("PSA 78!d!f!2"))
+    if t != "78":
+        fail(f"Expected '78' got {t} in {s}")
+
+    
 

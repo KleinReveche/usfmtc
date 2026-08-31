@@ -251,13 +251,13 @@ class USX:
         res.insert(0, root[0].copy(deep=True, parent=res))
         return self.__class__(res, grammar=self.grammar)
 
-    def gettext(self, *refs, skiptest=None):
+    def gettext(self, *refs, skiptest=None, notes=False):
         """ Returns the text of each reference one per line. skiptest is a fn
             to test whether text in the marker does not cause a word break. """
         root = self.getroot()
         res = []
         for (start, end, r) in self._procrefs(*refs, skiptest=skiptest):
-            text = start.copy_text(root, end)
+            text = start.copy_text(root, end, notes=notes, grammar=self.grammar)
             res.append(text)
         return "\n".join(res)
 
