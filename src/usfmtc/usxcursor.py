@@ -42,10 +42,10 @@ class ETCursor:
                 end = other.char
             return t[start:end], end < len(t)
         t = eloc.text if isin else eloc.tail
-        start = 0; end = len(t) if t else 0
+        start = 0; end = len(t) + 1 if t else 0
         if eloc == self.el and self.istext() == isin:
             start = self.char
-        if eloc == other.el and other.istext() == isin:
+        if eloc == other.el and other.istext() == isin and other.char != -1:
             end = other.char
         return (t[start:end], end < len(t)) if t else (t, False)
 
@@ -75,6 +75,14 @@ def testverse(v:str, verse:str, after=False) -> bool:
             return bi > t if after else t >= bi and t <= ba
         except ValueError:
             return False
+
+def getcat(el, grammar=None):
+    if grammar is None:
+        grammar = Grammar()
+    if el.tag != "para":
+        return ''
+    s = el.get('style', '')
+    return grammar.marker_categories.get(s, '')
 
 def vint(v:str|int) -> int:
     if isinstance(v, int):
@@ -189,19 +197,16 @@ def _findcvel(ref, usx, atend=False, parindex=0):
         while resm < len(ref.mrkrs):
             if not curr.word and not curr.char:
                 oparindex = parindex
-                t = ref.mrkrs[resm].mrkr   # look forward or backwards for a para
+                t = ref.mrkrs[resm].mrkr            # look forward or backwards for a para
                 catt = usx.grammar.marker_categories.get(t, "")
-                if catt == "sectionpara":       # we are looking for a sectionpara
-                    parindex -= 1
-                    while parindex > 0:         # scan backwards for start of sectionparas
-                        el = root[parindex]
-                        if el.tag == "para":
-                            s = el.get("style", "")
-                            if usx.grammar.marker_categories.get(s, "") != "sectionpara":
-                                break
-                        else:
-                            break
+                if root[parindex].tag == "chapter":   # bk c!m
+                    el, parindex = _scanel(ref.mrkrs[resm], usx, parindex+1, rend=None)
+                elif catt == "sectionpara":         # we are looking for a sectionpara
+                    while parindex > 0:             # scan backwards for start of sectionparas
                         parindex -= 1
+                        el = root[parindex]
+                        if getcat(el, grammar=usx.grammar) != "sectionpara":
+                            break
                     # now scan forwards for given para
                     el, parindex = _scanel(ref.mrkrs[resm], usx, parindex+1, rend=oparindex)
                 elif 'para' in catt or catt in ("introduction", "title"):   # introductions
