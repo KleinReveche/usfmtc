@@ -64,7 +64,10 @@ def usjtousx(adict, elfactory=None):
     if elfactory is None:
         elfactory = ParentElement       # Needed for adding esid_s. Or use lxml
     root = elfactory('usx')
-    # root.set('version', '3.1')
+    if 'version' in adict:
+        root.set('version', str(adict['version']))
+    else:
+        root.set('version', VERSION_NUM)
     last_node = None
     for item in adict['content']:
         if isinstance(item, str):

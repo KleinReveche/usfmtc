@@ -300,7 +300,7 @@ class USX:
             self.outUsx(outfpath, **kw)
         elif outtype == "usj":
             self.outUsj(outfpath, **kw)
-        elif outtype == "usfm":
+        elif outtype.startswith("usfm"):
             if outtype == "usfm3.0":
                 outtype = "usfm"
                 if version is None:
@@ -309,9 +309,11 @@ class USX:
 
     def canonicalise(self, version=None):
         """ Canonicalises the text especially with regard to whitespace """
+        if isinstance(version, (list, tuple)):
+            version = ".".join(str(x) for x in version)
         canonicalise(self.getroot(), version=version)
         if version is not None:
-            self.version = version
+            self.version = str(version)
 
     def regularise(self, ptx=False):
         """ Further edits to fix common mistakes that may not need fixing in all files:
@@ -343,9 +345,12 @@ class USX:
     @property
     def version(self):
         res = self.getroot().get('version', None)
-        if res is not None:
-            res = [int(x) for x in res.split(".")]
-        return res
+        if res:
+            try:
+                return [int(x.strip()) for x in res.split(".") if len(x.strip())]
+            except ValueError:
+                return None
+        return None
 
     @version.setter
     def version(self, version):
@@ -508,7 +513,7 @@ def main(hookcli=None, hookusx=None):
         if args.version is not None:
             usxdoc.version = args.version
         elif usxdoc.version is None:
-            usxdoc.version = [3, 1]
+            usxdoc.version = "3.1"
 
         if not args.canonical:
             usxdoc.canonicalise()
